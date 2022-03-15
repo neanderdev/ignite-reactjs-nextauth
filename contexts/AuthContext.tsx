@@ -1,6 +1,6 @@
 import Router from 'next/router';
-import { createContext, ReactNode, useState } from "react";
-import { setCookie } from 'nookies';
+import { createContext, ReactNode, useEffect, useState } from "react";
+import { setCookie, parseCookies } from 'nookies';
 
 import { api } from '../services/api';
 
@@ -30,6 +30,18 @@ export const AuthContext = createContext({} as AuthContextData);
 export function AuthProvider({ children }: AuthProviderProps) {
     const [user, setUser] = useState<User>();
     const isAuthenticated = !!user;
+
+    useEffect(() => {
+        const { 'nextauth.refreshToken': token } = parseCookies();
+
+        if (token) {
+            api.get('/me').then(response => {
+                const { email, permissions, roles } = response.data;
+
+                setUser({ email, permissions, roles });
+            });
+        }
+    }, []);
 
     async function signIn({ email, password }: SignInCredentials) {
         try {
@@ -64,6 +76,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
                 permissions,
                 roles,
             });
+
+            api.defaults.headers['Authorization'] = `Beared ${token}`;
 
             Router.push('/dashboard');
         } catch (err) {
